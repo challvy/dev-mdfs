@@ -59,19 +59,19 @@
   $ mvn spring-boot:run -D server.port=8764
   ```
 
-![zdfs-1](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-1.png)
+![zdfs-01](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-01.png)
 
 #### POST命令
 
-![zdfs-2](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+![zdfs-02](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-02.png)
 
-![zdfs-3](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-3.png)
+![zdfs-03](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-03.png)
 
 #### DELETE命令
 
-![zdfs-4](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-4.png)
+![zdfs-04](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-04.png)
 
-![zdfs-5](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-5.png)
+![zdfs-05](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-05.png)
 
 #### GET命令
 
@@ -83,15 +83,15 @@ localhost:8761/filename
 
 也可以在Postman查看当前已上传的文件，以及对应的文件分块数量
 
-![zdfs-6](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+![zdfs-06](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-06.png)
 
-![zdfs-8](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+![zdfs-08](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-08.png)
 
 #### DataNode状态检测
 
 框架提供好了接口，但失效问题以及数据迁移没有实现
 
-![zdfs-7](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+![zdfs-07](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-07.png)
 
 #### 数据库
 
