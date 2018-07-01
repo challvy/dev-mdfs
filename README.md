@@ -93,10 +93,6 @@ localhost:8761/filename
 
 ![zdfs-07](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-07.png)
 
-#### 数据库
-
-用户上传的文件块
-
 ## 不足与改进
 
 项目名全称为Zheng Distribute File System，功能性不足开篇也已经提到，当然也有自身设计性不足，如NameNode模块中的ZdfsNamenodeController实在太过杂乱，耦合度太大太大。项目后期会再实现改进的。
