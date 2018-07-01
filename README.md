@@ -40,8 +40,65 @@
 
 ### 实操演示
 
+#### 相关配置
 
+* zdfs-namenode只需开启一个进程即可
+* zdfs-datanode则需要多个，因此zdfs-datanode中的server.port不要事先配置，通过终端传入即可
+
+#### 运行程序
+
+* zdfs-namenode在IDEA中运行即可
+
+  可设置器端口号为8761
+
+* zdfs-datanode通过终端启动多个进程
+
+  ```
+  $ mvn spring-boot:run -D server.port=8762
+  $ mvn spring-boot:run -D server.port=8763
+  $ mvn spring-boot:run -D server.port=8764
+  ```
+
+![zdfs-1](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-1.png)
+
+#### POST命令
+
+![zdfs-2](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+
+![zdfs-3](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-3.png)
+
+#### DELETE命令
+
+![zdfs-4](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-4.png)
+
+![zdfs-5](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-5.png)
+
+#### GET命令
+
+当数据上传完成后，可以直接通过浏览器获取文件，在浏览器输入即可获得对应文件名的文件
+
+```
+localhost:8761/filename
+```
+
+也可以在Postman查看当前已上传的文件，以及对应的文件分块数量
+
+![zdfs-6](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+
+![zdfs-8](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+
+#### DataNode状态检测
+
+框架提供好了接口，但失效问题以及数据迁移没有实现
+
+![zdfs-7](https://github.com/challvy/zdfs/raw/master/README_RES/zdfs-2.png)
+
+#### 数据库
+
+用户上传的文件块
 
 ## 不足与改进
 
 项目名全称为Zheng Distribute File System，功能性不足开篇也已经提到，当然也有自身设计性不足，如NameNode模块中的ZdfsNamenodeController实在太过杂乱，耦合度太大太大。项目后期会再实现改进的。
+
+# End

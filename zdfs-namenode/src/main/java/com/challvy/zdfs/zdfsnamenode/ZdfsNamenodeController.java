@@ -63,7 +63,7 @@ public class ZdfsNamenodeController {
 
     @EventListener
     public void listen(EurekaInstanceRenewedEvent event) {
-        System.err.println("Renewed:\t" + event.getServerId() + "\t" + event.getAppName());
+        System.err.println("Renewed:\t" + event.getServerId());
     }
 
     @EventListener
