@@ -22,25 +22,25 @@ public class ZdfsDatanodeController {
     }
 
     @ResponseBody
-    @GetMapping("/{filename:.+}")
-    public ResponseEntity<Resource> get(@PathVariable String filename) {
+    @GetMapping("/{fileName:.+}")
+    public ResponseEntity<Resource> get(@PathVariable String fileName) {
         // 从配置好的文件夹处读取资源文件
-        Resource file = storageService.loadAsResource(filename);
+        Resource file = storageService.loadAsResource(fileName);
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION).body(file);
     }
 
     @PostMapping("/")
-    public String post(@RequestParam("file") MultipartFile file) {
+    public String post(@RequestParam("zdfs") MultipartFile file) {
         // 存储文件块至配置好的文件夹位置
         storageService.store(file);
         return "Posted";
     }
 
     @ResponseBody
-    @DeleteMapping("/{filename:.+}")
-    public String delete(@PathVariable String filename) {
+    @DeleteMapping("/{fileName:.+}")
+    public String delete(@PathVariable String fileName) {
         // 通过传入块文件名从配置好的文件夹处删除块文件
-        storageService.delete(filename);
+        storageService.delete(fileName);
         return "Deleted";
     }
 

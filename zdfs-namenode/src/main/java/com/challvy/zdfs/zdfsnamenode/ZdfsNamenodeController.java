@@ -17,49 +17,34 @@ import java.net.URL;
 import java.nio.channels.FileChannel;
 import java.util.*;
 
-
 @RestController
 public class ZdfsNamenodeController {
 
-    private final int BLOCK_SIZE = 32768;
+    // 分块大小
+    private final int SIZE_BLOCK = 32768;
     private final String blockDir = "zdfs/temp/block/";
     private static final String downloadDir = "zdfs/temp/download/";
 
-    // 所有可用的DataNode组的url
-    private ArrayList<String> urlList = new ArrayList<>();
+    // NameNode文件管理模型，<文件名:对应的分块数量>
+    private Map<String, Integer> namenodeFileSystem;
 
-    // 存储文件名以及对应的分块数量
-    private Map<String, Integer> mapFilenameBlocknum = new HashMap<>();
+    // DataNode文件管理模型，<文件分块名称:对应的DataNode URL集>
+    private Map<String, ArrayList<String>> datanodeFileSystem;
 
-    // 存储各个文件分块数量、位置等信息
-    private Map<String, List<String>> fileBlock_dataNodeURL = new HashMap<>();
-
-    public void addFileBlock(String dataNodeURL, String fileName, long blockIndex) {
-        String fileBlock = fileName + "#" + blockIndex;
-        List<String> URLS = fileBlock_dataNodeURL.get(fileBlock);
-        if (URLS == null) {
-            URLS = new LinkedList<>();
-            URLS.add(dataNodeURL);
-            fileBlock_dataNodeURL.put(fileBlock, URLS);
-        } else {
-            URLS.add(dataNodeURL);
-        }
-    }
-
-    public List<String> getDataNodeURL(String fileName, long blockIndex) {
-        return fileBlock_dataNodeURL.get(fileName + "#" + blockIndex);
-    }
-
-    public void removeFileBlock(String fileName, long blockIndex) {
-        String fileBlock = fileName + "#" + blockIndex;
-        fileBlock_dataNodeURL.remove(fileBlock);
-    }
+    // 所有可用DataNode集[URL]
+    private ArrayList<String> datanodeUrlList;
 
     ZdfsNamenodeController(){
+        // 初始化目录
         File block = new File(blockDir);
         File download = new File(downloadDir);
         block.mkdirs();
         download.mkdirs();
+
+        // 初始化数据
+        namenodeFileSystem = new HashMap<>();
+        datanodeUrlList = new ArrayList<>();
+        datanodeFileSystem = new HashMap<>();
     }
 
     // 以下四个函数是事件监听
@@ -72,7 +57,7 @@ public class ZdfsNamenodeController {
     public void listen(EurekaInstanceRegisteredEvent event) {
         InstanceInfo instanceInfo = event.getInstanceInfo();
         String datanode = instanceInfo.getHomePageUrl();
-        urlList.add(datanode);
+        datanodeUrlList.add(datanode);
         System.err.println("Registered:\t" + datanode);
     }
 
@@ -84,111 +69,125 @@ public class ZdfsNamenodeController {
     @EventListener
     public void listen(EurekaInstanceCanceledEvent event) {
         String datanode = "http://" + event.getServerId() + "/";
-        // 直接从可用节点组中删去，没有考虑节点失效问题
-        urlList.remove(datanode);
-        System.err.println("Canceled:\t" + event.getServerId() + "\t" + event.getAppName());
+        // TODO: 数据迁移。此处直接从可用节点组中删去，没有考虑节点失效问题
+        datanodeUrlList.remove(datanode);
+        System.err.println("Canceled:\t" + event.getServerId());
     }
 
-    @GetMapping("/all")
+    @GetMapping(value = "/all")
     public Map<String, Integer> get() {
-        // TODO: 增加接口，增加文件信息详情
-        return mapFilenameBlocknum;
+        return namenodeFileSystem;
     }
 
-    // 以下三个函数分别对应功能GET, POST, DELETE
+    // 以下三个函数分别对应功能GET,POST,DELETE
     @ResponseBody
-    @GetMapping("/{filename:.+}")
-    public ResponseEntity<Resource> get(@PathVariable String filename) throws IOException {
-        // TODO: 这里只实现对文件的处理，需对文件夹进行处理
-        File tempFile = new File(downloadDir + filename);
+    @GetMapping(value = "/{fileName:.+}")
+    public ResponseEntity<Resource> get(@PathVariable String fileName) throws IOException {
+        // TODO: 这里只实现对文件的处理，没有文件夹处理
+        File tempFile = new File(downloadDir + fileName);
         tempFile.createNewFile();
 
-        // 由于原文件被分块，可以借助FileChannel机制进行复原
-        FileChannel downloadFileChannel = new FileOutputStream(tempFile).getChannel();
-        for (int idx=0; idx<mapFilenameBlocknum.get(filename); idx++) {
-            List<String> dataNodeURLS = getDataNodeURL(filename, idx);
-            String blockedFileName = filename + "-" + idx;
+        // 由于原文件被分块，可以借助FileChannel机制进行组装复原
+        FileChannel fileChan = new FileOutputStream(tempFile).getChannel();
+        for (int idx=0; idx< namenodeFileSystem.get(fileName); idx++) {
+            String blockName = fileName + "-" + idx;
+            ArrayList<String> datanodeUrl = datanodeFileSystem.get(blockName);
 
-            // 任取一个可用节点获取文件即可
-            String dataNodeURL = dataNodeURLS.get(0);
-            if(dataNodeURL!=null) {
-                String resourceURL = dataNodeURL + blockedFileName;
-                UrlResource urlResource = new UrlResource(new URL(resourceURL));
-                InputStream inputStream = urlResource.getInputStream();
-
-                byte[] bytes = new byte[BLOCK_SIZE];
-                ByteArrayOutputStream out = new ByteArrayOutputStream();
-                int n, blockSize = 0;
-                while ( (n=inputStream.read(bytes)) != -1) {
-                    out.write(bytes,0,n);
-                    blockSize += n;
+            // 任取一个可用节点位置来获取文件分块位置即可，这里直接默认取第一个，显然可以优化
+            String datanodeUrlItem = datanodeUrl.get(0);
+            if(datanodeUrlItem!=null) {
+                String resUrl = datanodeUrlItem + blockName;
+                UrlResource urlRes = new UrlResource(new URL(resUrl));
+                InputStream inputStrm = urlRes.getInputStream();
+                byte[] byteBlock = new byte[SIZE_BLOCK];
+                ByteArrayOutputStream byteArrayOutputStrm = new ByteArrayOutputStream();
+                int tmpSize;
+                int size=0;
+                while (-1 != (tmpSize=inputStrm.read(byteBlock))) {
+                    byteArrayOutputStrm.write(byteBlock,0, tmpSize);
+                    size += tmpSize;
                 }
-                bytes = out.toByteArray();
-
-                File slicedFile = new File(blockDir + blockedFileName);
-                FileOutputStream fos = new FileOutputStream(slicedFile);
-                fos.write(bytes, 0, blockSize);
-                fos.close();
-
-                FileChannel inputChannel = new FileInputStream(slicedFile).getChannel();
-                inputChannel.transferTo(0, slicedFile.length(), downloadFileChannel);
-                inputChannel.close();
+                byteBlock = byteArrayOutputStrm.toByteArray();
+                File blockFile = new File(blockDir + blockName);
+                FileOutputStream fileOutputStream = new FileOutputStream(blockFile);
+                fileOutputStream.write(byteBlock, 0, size);
+                fileOutputStream.close();
+                FileChannel tmpChan = new FileInputStream(blockFile).getChannel();
+                tmpChan.transferTo(0, blockFile.length(), fileChan);
+                tmpChan.close();
             }
         }
-        downloadFileChannel.close();
-        System.err.println("Got:\t" + filename);
+        fileChan.close();
+        System.err.println("Got:\t" + fileName);
         Resource urlRes = new UrlResource(tempFile.toURI());
         return ResponseEntity.ok().header(HttpHeaders.CONTENT_DISPOSITION,urlRes.getFilename()).body(urlRes);
     }
 
     @PostMapping("/")
-    public String post(@RequestParam("file") MultipartFile file) throws IOException {
-        String fileName = file.getOriginalFilename();
+    public String post(@RequestParam("zdfs") MultipartFile file) throws IOException {
+        // 先对文件进行分块，然后将分块文件交给DataNode存储，同时datanodeFileSystem要记录分块文件的分块文件名以及存储位置信息
 
         // 计算原上传文件所需的分块数，向上取整
-        int numBlock = (int)(Math.ceil(file.getSize()/BLOCK_SIZE));
-
+        int blockNum = (int)(Math.ceil(file.getSize()/ SIZE_BLOCK));
+        String fileName = file.getOriginalFilename();
         BufferedInputStream bufferedInputStream = new BufferedInputStream(file.getInputStream());
-        // 循环处理每一个分块
-        for(int idx=0; idx<numBlock; idx++) {
-            byte byteBlock[] = new byte[BLOCK_SIZE];
+
+        // 循环处理每一个分块文件
+        for(int idx=0; idx<blockNum; idx++) {
+            byte byteBlock[] = new byte[SIZE_BLOCK];
             int blockSize = bufferedInputStream.read(byteBlock);
-            String blockName = blockDir + fileName + "-" + idx;
-            File itemFile = new File(blockName);
-            FileOutputStream fileOutputStream = new FileOutputStream(itemFile);
+            String blockName = fileName + "-" + idx;
+            File blockFile = new File(blockDir + blockName);
+            FileOutputStream fileOutputStream = new FileOutputStream(blockFile);
             fileOutputStream.write(byteBlock, 0, blockSize);
             fileOutputStream.close();
+
             // TODO: NameNode没有暂时实现负载均衡，也没有设置数据备份数量参数，这里直接将上传的数据存入所有可用DataNode
-            for (String URL : urlList) {
-                FileSystemResource resource = new FileSystemResource(itemFile);
+            for(String datanodeUrlItem : datanodeUrlList) {
+                // 设置与DataNode交互的参数，让DataNode存储分块文件
+                FileSystemResource res = new FileSystemResource(blockFile);
                 MultiValueMap<String, Object> parameters = new LinkedMultiValueMap<>();
-                parameters.add("file", resource);
+                parameters.add("zdfs", res);
                 RestTemplate rest = new RestTemplate();
-                String response = rest.postForObject(URL, parameters, String.class);
-                addFileBlock(URL, fileName, idx);
-                System.err.println(response + ":\t" + fileName + "\tBlock" + idx + "\t" + URL);
+                String response = rest.postForObject(datanodeUrlItem, parameters, String.class);
+
+                // 记录分块数据位置信息
+                ArrayList<String> datanodeUrl = datanodeFileSystem.get(blockName);
+                if(null!=datanodeUrl) {
+                    datanodeUrl.add(datanodeUrlItem);
+                } else {
+                    datanodeUrl = new ArrayList<>();
+                    datanodeUrl.add(datanodeUrlItem);
+                    datanodeFileSystem.put(blockName, datanodeUrl);
+                }
+                System.err.println(response+":\t"+ fileName+"-"+idx +"\t"+datanodeUrlItem);
             }
-            itemFile.delete();
+            // 清空，循环利用
+            blockFile.delete();
         }
-        mapFilenameBlocknum.put(fileName, numBlock);
+        namenodeFileSystem.put(fileName, blockNum);
         return "Posted.";
     }
 
     @ResponseBody
-    @DeleteMapping("/{filename:.+}")
-    public String delete(@PathVariable String filename) {
-        int numBlocks = mapFilenameBlocknum.get(filename);
-        for (int blockIndex = 0; blockIndex < numBlocks; blockIndex ++) {
-            List<String> dataNodeURLS = getDataNodeURL(filename, blockIndex);
-            for (String dataNodeURL : dataNodeURLS) {
-                String URL = dataNodeURL + filename + "-" + blockIndex;
+    @DeleteMapping(value = "/{fileName:.+}")
+    public String delete(@PathVariable String fileName) {
+        // 删除文件，即删除文件对应的所有分块
+        for (int idx = 0; idx<namenodeFileSystem.get(fileName); idx++) {
+            String blockName = fileName + "-" + idx;
+            ArrayList<String> datanodeUrl = datanodeFileSystem.get(blockName);
+            // 删除文件，包括所有备份的文件（分块）
+            for(String datanodeUrlItem:datanodeUrl) {
+                String blockUrl = datanodeUrlItem + blockName;
                 RestTemplate rest = new RestTemplate();
-                rest.delete(URL);
-                System.err.println("Deleted:\t" + URL);
+                rest.delete(blockUrl);
+                System.err.println("Deleted:\t" + blockUrl);
             }
-            removeFileBlock(filename, blockIndex);
+            // 从DataNode文件管理模型中删除本文件分块项
+            datanodeFileSystem.remove(blockName);
         }
-        mapFilenameBlocknum.remove(filename);
+        // 从NameNode文件管理模型中删除本文件项
+        namenodeFileSystem.remove(fileName);
         return "Deleted.";
     }
 
