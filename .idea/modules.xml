@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/zdfs.iml" filepath="$PROJECT_DIR$/zdfs.iml" />
+      <module fileurl="file://$PROJECT_DIR$/zdfs-datanode/zdfs-datanode.iml" filepath="$PROJECT_DIR$/zdfs-datanode/zdfs-datanode.iml" />
+      <module fileurl="file://$PROJECT_DIR$/zdfs-namenode/zdfs-namenode.iml" filepath="$PROJECT_DIR$/zdfs-namenode/zdfs-namenode.iml" />
+    </modules>
+  </component>
+</project>
